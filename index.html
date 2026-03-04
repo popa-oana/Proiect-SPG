@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Proiect SPG - P1: Peisaj Montan Matematic</title>
+  <title>Proiect SPG - P2: Potecă Neregulată</title>
   <style>
     body { margin: 0; overflow: hidden; background-color: #8cb7e6; }
     canvas { display: block; }
@@ -21,13 +21,13 @@
   </style>
 </head>
 <body>
-<div id="info">P1: Teren și Munți (Cu nivelare tip "Bulldozer")<br>Folosește mouse-ul pentru a explora</div>
+<div id="info">P2: Potecă Montană Neregulată (S6)<br>Folosește mouse-ul pentru a explora</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
 <script>
-  // --- 1. SETĂRI DE BAZĂ ---
+  // --- 1. SETĂRI DE BAZĂ (Originale) ---
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0x8cb7e6, 500, 3500);
 
@@ -37,7 +37,7 @@
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
-  // --- 2. LUMINI ---
+  // --- 2. LUMINI (Originale) ---
   const ambientLight = new THREE.AmbientLight(new THREE.Color(0.50, 0.48, 0.40), 1.0);
   scene.add(ambientLight);
 
@@ -56,8 +56,14 @@
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
   });
+  // Textura nouă pentru drum (P2)
+  const drumTexture = textureLoader.load('textures/drum.jpg', (tex) => {
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(1, 25);
+  });
 
-  // --- 4. CER ---
+  // --- 4. CER (Original) ---
   const skyboxGeometry = new THREE.BoxGeometry(4000, 4000, 4000);
   const skyboxMaterials = [
     new THREE.MeshBasicMaterial({ map: cerTexture, side: THREE.BackSide, depthWrite: false }),
@@ -76,7 +82,7 @@
     return Math.pow(v, 2.4);
   }
 
-  // --- 5. MUNȚII ÎN FUNDAL ---
+  // --- 5. MUNȚII ÎN FUNDAL (Original) ---
   function createMountainsReal() {
     const xMin = -1900.0, xMax = 1900.0;
     const zNear = -300.0, zFar = -1450.0;
@@ -113,7 +119,7 @@
     scene.add(new THREE.Mesh(skirtGeo, new THREE.MeshBasicMaterial({ color: 0x595959 })));
   }
 
-  // --- 6. PLANUL MARE ȘI PATCH-UL CU "BULLDOZER" ---
+  // --- 6. PLANUL MARE ȘI PATCH-UL CU "BULLDOZER" (Original) ---
   function createGround() {
     const groundGeo = new THREE.PlaneGeometry(4000, 4000);
     groundGeo.rotateX(-Math.PI / 2);
@@ -122,8 +128,6 @@
     const xMin = -1000.0, xMax = 1000.0;
     const zMin = -500.0, zMax = 800.0;
     const NX = 180, NZ = 160;
-
-    // Parametru "Bulldozer": pragul de înălțime maximă (nivelare)
     const bulldozerThreshold = 18.0;
 
     const patchGeo = new THREE.PlaneGeometry(xMax-xMin, zMax-zMin, NX, NZ);
@@ -134,19 +138,12 @@
     for(let i=0; i<patchPos.count; i++) {
       const x = patchPos.getX(i);
       const z = patchPos.getZ(i);
-
-      // Calcul logică teren
       const bump1 = 15.0 * Math.exp(-((x * x) / 50000 + ((z + 80.0) * (z + 80.0)) / 30000));
       const waves = 12.0 * Math.sin(0.01 * x) * Math.cos(0.01 * z);
       let finalY = (bump1 + waves);
-
-      // --- METODA BULLDOZER ---
-      // Dacă terenul e prea înalt, îl "nivelăm" la valoarea pragului
       if (finalY > bulldozerThreshold) {
-        // Opțional: folosim o interpolare pentru ca tăierea să nu fie bruscă
         finalY = bulldozerThreshold + (finalY - bulldozerThreshold) * 0.2;
       }
-
       patchPos.setY(i, finalY);
     }
 
@@ -154,10 +151,40 @@
     scene.add(new THREE.Mesh(patchGeo, new THREE.MeshPhongMaterial({ map: iarbaTexture })));
   }
 
+  // --- 7. CIRCUIT STRADAL / POTECĂ (P2 - ADAUGAT) ---
+  function createCircuit() {
+    // Definirea geometrică a unui circuit închis cu formă neregulată
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-700, 0, 400),
+      new THREE.Vector3(-450, 0, 750),
+      new THREE.Vector3(150, 0, 600),
+      new THREE.Vector3(550, 0, 850),
+      new THREE.Vector3(800, 0, 300),
+      new THREE.Vector3(450, 0, -100),
+      new THREE.Vector3(50, 0, -250),
+      new THREE.Vector3(-500, 0, -50)
+    ], true); // true = circuit închis
+
+    // Creăm geometria tip bandă (Tube turtit)
+    const tubeGeo = new THREE.TubeGeometry(curve, 128, 40, 10, true);
+    const potecaMesh = new THREE.Mesh(
+      tubeGeo,
+      new THREE.MeshPhongMaterial({ map: drumTexture, side: THREE.DoubleSide })
+    );
+
+    // Ajustări pentru a pluti deasupra reliefului
+    potecaMesh.scale.set(1, 0.02, 1);
+    potecaMesh.position.y = 22; // Deasupra pragului Bulldozer de 18.0
+
+    scene.add(potecaMesh);
+  }
+
+  // --- INIȚIALIZARE ---
   createMountainsReal();
   createGround();
+  createCircuit();
 
-  camera.position.set(0, 100, 800);
+  camera.position.set(0, 200, 1000);
   const controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enablePan = false;
   controls.enableDamping = true;

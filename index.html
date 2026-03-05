@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Proiect SPG - Examen C1: Fizică Teren Perfectă</title>
+  <title>Proiect SPG - Examen C1: Coliziuni și Relief Perfect</title>
   <style>
     body { margin: 0; overflow: hidden; background-color: #8cb7e6; }
     canvas { display: block; }
@@ -21,7 +21,7 @@
   </style>
 </head>
 <body>
-<div id="info">C1: Conduce mașina cu WASD / Săgeți.<br>Mașina urcă văile/dealurile. Munții, marginea și obiectele te opresc!</div>
+<div id="info">C1: Conduce mașina cu WASD / Săgeți.<br>Urcă pe dealuri, dar evită: Munții, Marginea Hărții, Stâlpii, Brazii, Pietrele și TOATE Florile!</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -40,6 +40,7 @@
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   document.body.appendChild(renderer.domElement);
 
+  // LISTĂ PENTRU COLIZIUNI (Obstacole punctuale)
   const obstacles = [];
 
   // --- 2. LUMINI GLOBALE ---
@@ -75,7 +76,7 @@
     tex.repeat.set(1, 25);
   });
 
-  // --- 4. MATEMATICA TERENULUI ȘI A DRUMULUI ---
+  // --- 4. DRUM ȘI LOGICĂ TEREN ---
   const pathCurve = new THREE.CatmullRomCurve3([
     new THREE.Vector3(-700, 0, 400), new THREE.Vector3(-450, 0, 750),
     new THREE.Vector3(150, 0, 600),  new THREE.Vector3(550, 0, 850),
@@ -83,9 +84,8 @@
     new THREE.Vector3(50, 0, -250),  new THREE.Vector3(-500, 0, -50)
   ], true);
 
-  const roadPoints = pathCurve.getPoints(400);
+  const roadPoints = pathCurve.getPoints(1000);
 
-  // Funcție ultra-rapidă pentru calculul distanței față de drum
   function getDistanceToRoad(x, z) {
     let minDistSq = Infinity;
     for (let i = 0; i < roadPoints.length; i++) {
@@ -114,7 +114,6 @@
     return finalY;
   }
 
-  // Înălțimea ierbii (nivelată sub drum)
   function getTerrainHeight(x, z) {
     const rawY = getRawTerrainHeight(x, z);
     const dist = getDistanceToRoad(x, z);
@@ -129,7 +128,6 @@
     } else return rawY;
   }
 
-  // Înălțimea exactă a muntelui (folosită pentru generare și coliziune!)
   function getMountainHeight(x, z) {
     if (z > -300) return -9999;
     let dist = clamp01((-z - 300.0) / 1100.0);
@@ -163,7 +161,7 @@
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
       const z = pos.getZ(i);
-      pos.setY(i, getMountainHeight(x, z)); // Folosește logica matematică
+      pos.setY(i, getMountainHeight(x, z));
     }
     mountainGeo.computeVertexNormals();
     const mountainMesh = new THREE.Mesh(mountainGeo, new THREE.MeshPhongMaterial({ map: muntiTexture, color: 0x888888 }));
@@ -171,9 +169,8 @@
     scene.add(mountainMesh);
   }
 
-  // --- 6. TEREN SINGULAR (Rezolvă problema cu intratul sub iarbă!) ---
+  // --- 6. TEREN SINGULAR ---
   function createGround() {
-    // Generăm un singur teren uriaș, fără planuri suprapuse
     const groundGeo = new THREE.PlaneGeometry(4000, 4000, 256, 256);
     groundGeo.rotateX(-Math.PI / 2);
 
@@ -245,7 +242,8 @@
       petal.rotation.y = angle; petal.castShadow = true;
       flowerGroup.add(petal);
     }
-    flowerGroup.scale.set(1.5, 1.5, 1.5);
+    // MODIFICARE: Flori mult mai scunde (0.7 în loc de 1.5)
+    flowerGroup.scale.set(0.7, 0.7, 0.7);
     return flowerGroup;
   }
 
@@ -314,14 +312,23 @@
       if (!isOnRoad(rX, rZ, 80)) {
         const cluster = new THREE.Group();
         cluster.position.set(rX, getTerrainHeight(rX, rZ), rZ);
+
         for (let j = 0; j < 3; j++) {
           const flower = createEdelweiss();
-          flower.position.set(Math.random() * 25 - 12.5, 0, Math.random() * 25 - 12.5);
+          // Calculăm un offset local pentru floare în interiorul grupului
+          const offsetX = Math.random() * 20 - 10;
+          const offsetZ = Math.random() * 20 - 10;
+
+          flower.position.set(offsetX, 0, offsetZ);
           flower.rotation.y = Math.random() * Math.PI;
           cluster.add(flower);
+
+          // MODIFICARE: Adăugăm hitbox pentru FIECARE floare în mod individual, pe coordonatele ei reale globale
+          const flowerWorldX = rX + offsetX;
+          const flowerWorldZ = rZ + offsetZ;
+          obstacles.push({ x: flowerWorldX, z: flowerWorldZ, radius: 1.5 });
         }
         scene.add(cluster); count++;
-        obstacles.push({ x: rX, z: rZ, radius: 2.0 }); // Hitbox Flori
       }
     }
 
@@ -332,7 +339,7 @@
         const stone = createStone();
         stone.position.set(rX, getTerrainHeight(rX, rZ), rZ);
         scene.add(stone); count++;
-        obstacles.push({ x: rX, z: rZ, radius: 4.0 }); // Hitbox Piatră
+        obstacles.push({ x: rX, z: rZ, radius: 4.0 });
       }
     }
 
@@ -343,7 +350,7 @@
         const tree = createPineTreeTall();
         tree.position.set(rX, getTerrainHeight(rX, rZ), rZ);
         scene.add(tree); count++;
-        obstacles.push({ x: rX, z: rZ, radius: 3.5 }); // Hitbox Copac
+        obstacles.push({ x: rX, z: rZ, radius: 3.5 });
       }
     }
   }
@@ -361,7 +368,8 @@
 
       const dirToRoad = normal.clone().multiplyScalar(-1);
       createStreetLight(lightPos, dirToRoad);
-      obstacles.push({ x: lightPos.x, z: lightPos.z, radius: 3.5 }); // Hitbox Stâlp
+
+      obstacles.push({ x: lightPos.x, z: lightPos.z, radius: 4.0 });
     }
   }
 
@@ -426,7 +434,7 @@
   const turnSpeed = 0.04;
 
   function checkCollision(nextX, nextZ) {
-    const carRadius = 3.0; // Hitbox optimizat pentru condus
+    const carRadius = 3.0;
 
     // 1. Marginea lumii
     if (nextX < -1950 || nextX > 1950 || nextZ > 1950 || nextZ < -1450) return true;
@@ -434,7 +442,6 @@
     // 2. Muntele (Coliziune matematică calculată precis)
     const mY = getMountainHeight(nextX, nextZ);
     const tY = getTerrainHeight(nextX, nextZ);
-    // Dacă stânca iese din iarbă, nu ai voie să treci
     if (mY > tY + 1.0) return true;
 
     // 3. Coliziuni cu restul obiectelor
@@ -467,10 +474,9 @@
       carGroup.position.x = nextX;
       carGroup.position.z = nextZ;
     } else {
-      carSpeed = 0; // Oprit de obstacol!
+      carSpeed = 0;
     }
 
-    // Mașina preia înălțimea terenului din punctul curent
     carGroup.position.y = getTerrainHeight(carGroup.position.x, carGroup.position.z) + 1.5;
 
     controls.target.copy(carGroup.position);

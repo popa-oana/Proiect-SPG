@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Proiect SPG - Restaurare Munți și Flori pe Iarbă</title>
+  <title>Proiect SPG - Restaurare Munți, Flori, Pietre și Brazi ÎNALȚI</title>
   <style>
     body { margin: 0; overflow: hidden; background-color: #8cb7e6; }
     canvas { display: block; }
@@ -21,7 +21,7 @@
   </style>
 </head>
 <body>
-<div id="info">P2: Munți Originali + Flori Mari (Evită Drumul)<br>Obiecte statice plasate conform S6</div>
+<div id="info">P2: Munți, Flori, Pietre și Brazi ÎNALȚI (Procedural)<br>Evită Drumul și Munții</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -161,13 +161,15 @@
     scene.add(potecaMesh);
   }
 
-  // --- 9. OBIECTE STATICE: FLORI MARI (P2.3) ---
+  // --- 9. OBIECTE STATICE: FLORI, PIETRE ȘI BRAZI ÎNALȚI ---
   function createEdelweiss() {
     const flowerGroup = new THREE.Group();
-    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 10, 4), new THREE.MeshPhongMaterial({ color: 0x447744 }));
+    const stemMat = new THREE.MeshPhongMaterial({ color: 0x447744 });
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 10, 4), stemMat);
     stem.position.y = 5;
     flowerGroup.add(stem);
-    const center = new THREE.Mesh(new THREE.SphereGeometry(1.5, 8, 8), new THREE.MeshPhongMaterial({ color: 0xffcc44 }));
+    const centerMat = new THREE.MeshPhongMaterial({ color: 0xffcc44 });
+    const center = new THREE.Mesh(new THREE.SphereGeometry(1.5, 8, 8), centerMat);
     center.position.y = 10;
     flowerGroup.add(center);
     const petalGeo = new THREE.ConeGeometry(1, 5, 3);
@@ -181,11 +183,60 @@
       petal.rotation.y = angle;
       flowerGroup.add(petal);
     }
-    flowerGroup.scale.set(1.5, 1.5, 1.5); // Flori mari
+    flowerGroup.scale.set(1.5, 1.5, 1.5);
     return flowerGroup;
   }
 
-  function isOnRoad(x, z, threshold = 85) {
+  function createStone() {
+    const radius = 3 + Math.random() * 4;
+    const stoneGeo = new THREE.DodecahedronGeometry(radius, 0);
+    const stoneMat = new THREE.MeshPhongMaterial({
+      color: 0x888888,
+      flatShading: true
+    });
+    const stone = new THREE.Mesh(stoneGeo, stoneMat);
+    stone.scale.set(1 + Math.random() * 0.5, 0.6 + Math.random() * 0.4, 1 + Math.random() * 0.5);
+    stone.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+    return stone;
+  }
+
+  // --- FUNCȚIA PENTRU BRAZI ÎNALȚI (P2.4 UPDATE) ---
+  function createPineTreeTall() {
+    const treeGroup = new THREE.Group();
+
+    // Trunchi ÎNALT
+    const trunkHeight = 25 + Math.random() * 10; // Trunchi semnificativ mai lung
+    const trunkGeo = new THREE.CylinderGeometry(1.2, 2.2, trunkHeight, 6);
+    const trunkMat = new THREE.MeshPhongMaterial({ color: 0x5c4033, flatShading: true });
+    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+    trunk.position.y = trunkHeight / 2;
+    treeGroup.add(trunk);
+
+    // Coroana (Conuri suprapuse - Low Poly, flat shading)
+    const leavesColors = [0x224422, 0x1a3a1a, 0x2a502a];
+    const leavesMat = new THREE.MeshPhongMaterial({
+      color: leavesColors[Math.floor(Math.random()*3)],
+      flatShading: true
+    });
+
+    // Conuri mai mari și mai înalte
+    const coneCount = 3 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < coneCount; i++) {
+      const coneRadius = 9 - (i * 1.5); // Baza mai lată
+      const coneHeight = 18 - (i * 1.5); // Conuri mai înalte
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(coneRadius, coneHeight, 7), leavesMat);
+      // Plasăm conurile de la vârful trunchiului în sus
+      cone.position.y = trunkHeight + (i * 7);
+      treeGroup.add(cone);
+    }
+
+    // Variem puțin dimensiunea finală
+    const finalScale = 1.0 + Math.random() * 0.5; // Mult mai mari în total
+    treeGroup.scale.set(finalScale, finalScale, finalScale);
+    return treeGroup;
+  }
+
+  function isOnRoad(x, z, threshold = 95) {
     const points = pathCurve.getPoints(200);
     for (let p of points) {
       const distSq = (x - p.x)**2 + (z - p.z)**2;
@@ -194,13 +245,13 @@
     return false;
   }
 
-  function populateFieldWithFlowers(numClusters = 65) {
-    let placed = 0;
-    while (placed < numClusters) {
+  function populateField() {
+    // 1. Plasăm Florile (Grupuri)
+    let flowersPlaced = 0;
+    while (flowersPlaced < 60) {
       const randX = Math.random() * 1800 - 900;
-      const randZ = Math.random() * 1200 - 450;
-
-      if (!isOnRoad(randX, randZ)) {
+      const randZ = Math.random() * 1100 - 300;
+      if (!isOnRoad(randX, randZ, 80)) {
         const cluster = new THREE.Group();
         cluster.position.set(randX, getTerrainHeight(randX, randZ), randZ);
         for (let j = 0; j < 3; j++) {
@@ -210,7 +261,34 @@
           cluster.add(flower);
         }
         scene.add(cluster);
-        placed++;
+        flowersPlaced++;
+      }
+    }
+
+    // 2. Plasăm Pietrele
+    let stonesPlaced = 0;
+    while (stonesPlaced < 70) {
+      const randX = Math.random() * 1800 - 900;
+      const randZ = Math.random() * 1100 - 300;
+      if (!isOnRoad(randX, randZ, 80)) {
+        const stone = createStone();
+        stone.position.set(randX, getTerrainHeight(randX, randZ), randZ);
+        scene.add(stone);
+        stonesPlaced++;
+      }
+    }
+
+    // 3. Plasăm Brazii ÎNALȚI
+    let treesPlaced = 0;
+    while (treesPlaced < 75) { // 75 de brazi înalți
+      const randX = Math.random() * 1800 - 900;
+      const randZ = Math.random() * 1100 - 300;
+      // Folosim un threshold mai mare pentru a preveni suprapunerea cu marginea drumului
+      if (!isOnRoad(randX, randZ, 110)) {
+        const tree = createPineTreeTall();
+        tree.position.set(randX, getTerrainHeight(randX, randZ), randZ);
+        scene.add(tree);
+        treesPlaced++;
       }
     }
   }
@@ -219,7 +297,7 @@
   createMountainsReal();
   createGround();
   createCircuit();
-  populateFieldWithFlowers(65);
+  populateField();
 
   camera.position.set(0, 400, 1200);
   const controls = new THREE.OrbitControls(camera, renderer.domElement);

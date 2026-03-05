@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Proiect SPG - P3: Teren Nivelat sub Drum</title>
+  <title>Proiect SPG - Examen C1: Fizică Teren Perfectă</title>
   <style>
     body { margin: 0; overflow: hidden; background-color: #8cb7e6; }
     canvas { display: block; }
@@ -21,7 +21,7 @@
   </style>
 </head>
 <body>
-<div id="info">P3: Teren nivelat automat sub circuit<br>Gata pentru mașină (C1)</div>
+<div id="info">C1: Conduce mașina cu WASD / Săgeți.<br>Mașina urcă văile/dealurile. Munții, marginea și obiectele te opresc!</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -36,10 +36,11 @@
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setClearColor(new THREE.Color(0.55, 0.72, 0.90));
   renderer.setSize(window.innerWidth, window.innerHeight);
-
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   document.body.appendChild(renderer.domElement);
+
+  const obstacles = [];
 
   // --- 2. LUMINI GLOBALE ---
   const ambientLight = new THREE.AmbientLight(new THREE.Color(0.40, 0.38, 0.35), 0.8);
@@ -52,7 +53,6 @@
   sunLight.shadow.mapSize.height = 2048;
   sunLight.shadow.camera.near = 100;
   sunLight.shadow.camera.far = 3000;
-
   const d = 1500;
   sunLight.shadow.camera.left = -d;
   sunLight.shadow.camera.right = d;
@@ -75,7 +75,7 @@
     tex.repeat.set(1, 25);
   });
 
-  // --- 4. DEFINIREA DRUMULUI (Mutată mai sus pentru a fi folosită de teren) ---
+  // --- 4. MATEMATICA TERENULUI ȘI A DRUMULUI ---
   const pathCurve = new THREE.CatmullRomCurve3([
     new THREE.Vector3(-700, 0, 400), new THREE.Vector3(-450, 0, 750),
     new THREE.Vector3(150, 0, 600),  new THREE.Vector3(550, 0, 850),
@@ -83,23 +83,27 @@
     new THREE.Vector3(50, 0, -250),  new THREE.Vector3(-500, 0, -50)
   ], true);
 
-  // Puncte pre-calculate pentru a măsura rapid distanța față de drum
-  const roadPoints = pathCurve.getPoints(300);
+  const roadPoints = pathCurve.getPoints(400);
 
+  // Funcție ultra-rapidă pentru calculul distanței față de drum
   function getDistanceToRoad(x, z) {
     let minDistSq = Infinity;
-    for (let p of roadPoints) {
-      const distSq = (x - p.x)**2 + (z - p.z)**2;
+    for (let i = 0; i < roadPoints.length; i++) {
+      const p = roadPoints[i];
+      const dx = x - p.x;
+      const dz = z - p.z;
+      const distSq = dx*dx + dz*dz;
       if (distSq < minDistSq) minDistSq = distSq;
     }
     return Math.sqrt(minDistSq);
   }
 
-  // --- 5. LOGICĂ TEREN (Aplatizare sub drum) ---
   const bulldozerThreshold = 18.0;
-  const ROAD_HEIGHT = 1.0; // Înălțimea fixă a drumului
+  const ROAD_HEIGHT = 1.0;
 
-  // Calculează forma brută a dealurilor
+  function clamp01(v) { return Math.max(0.0, Math.min(1.0, v)); }
+  function ridged(x) { return Math.pow(1.0 - Math.abs(Math.sin(x)), 2.4); }
+
   function getRawTerrainHeight(x, z) {
     const bump1 = 15.0 * Math.exp(-((x * x) / 50000 + ((z + 80.0) * (z + 80.0)) / 30000));
     const waves = 12.0 * Math.sin(0.01 * x) * Math.cos(0.01 * z);
@@ -110,32 +114,35 @@
     return finalY;
   }
 
-  // Modifică relieful pentru a fi plat fix pe sub drum
+  // Înălțimea ierbii (nivelată sub drum)
   function getTerrainHeight(x, z) {
     const rawY = getRawTerrainHeight(x, z);
     const dist = getDistanceToRoad(x, z);
+    const roadHalfWidth = 22;
+    const blendZone = 40;
 
-    const roadHalfWidth = 22; // Jumătate din lățimea drumului
-    const blendZone = 40;     // Tranziție de 40 unități (pantă de la drum la deal)
-
-    if (dist < roadHalfWidth) {
-      // Punctul e fix sub asfalt -> Terenul devine perfect plat
-      return ROAD_HEIGHT;
-    } else if (dist < roadHalfWidth + blendZone) {
-      // Punctul e pe marginea drumului -> Trecere lină între drum și deal (Smoothstep)
+    if (dist < roadHalfWidth) return ROAD_HEIGHT;
+    else if (dist < roadHalfWidth + blendZone) {
       let t = (dist - roadHalfWidth) / blendZone;
       t = t * t * (3 - 2 * t);
       return ROAD_HEIGHT * (1 - t) + rawY * t;
-    } else {
-      // Suntem departe de drum -> Deal normal
-      return rawY;
-    }
+    } else return rawY;
   }
 
-  function clamp01(v) { return Math.max(0.0, Math.min(1.0, v)); }
-  function ridged(x) { return Math.pow(1.0 - Math.abs(Math.sin(x)), 2.4); }
+  // Înălțimea exactă a muntelui (folosită pentru generare și coliziune!)
+  function getMountainHeight(x, z) {
+    if (z > -300) return -9999;
+    let dist = clamp01((-z - 300.0) / 1100.0);
+    const t1 = 0.0032 * x + 0.0017 * z;
+    const t2 = 0.0067 * x - 0.0039 * z;
+    const t3 = 0.0130 * x + 0.0110 * z;
+    const base = 0.55 * (Math.sin(t1) * 0.5 + 0.5) + 0.35 * (Math.sin(t2) * 0.5 + 0.5) + 0.10 * (Math.sin(t3) * 0.5 + 0.5);
+    const spikes = 0.55 * ridged(2.2 * t1) + 0.30 * ridged(3.7 * t2) + 0.15 * ridged(6.0 * t3);
+    let h = Math.pow(0.78 * base + 0.22 * spikes, 1.25);
+    return (h * (40.0 + dist * 520.0) * 1.22) - 115.0;
+  }
 
-  // --- 6. CER (SKYBOX) ---
+  // --- 5. CER ȘI MUNȚI ---
   const skyboxGeometry = new THREE.BoxGeometry(4000, 4000, 4000);
   const skyboxMaterials = [
     new THREE.MeshBasicMaterial({ map: cerTexture, side: THREE.BackSide, depthWrite: false }),
@@ -147,7 +154,6 @@
   ];
   scene.add(new THREE.Mesh(skyboxGeometry, skyboxMaterials));
 
-  // --- 7. MUNȚII ÎN FUNDAL ---
   function createMountainsReal() {
     const mountainGeo = new THREE.PlaneGeometry(3800, 1150, 180, 90);
     mountainGeo.rotateX(-Math.PI / 2);
@@ -157,14 +163,7 @@
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
       const z = pos.getZ(i);
-      let dist = clamp01((-z - 300.0) / 1100.0);
-      const t1 = 0.0032 * x + 0.0017 * z;
-      const t2 = 0.0067 * x - 0.0039 * z;
-      const t3 = 0.0130 * x + 0.0110 * z;
-      const base = 0.55 * (Math.sin(t1) * 0.5 + 0.5) + 0.35 * (Math.sin(t2) * 0.5 + 0.5) + 0.10 * (Math.sin(t3) * 0.5 + 0.5);
-      const spikes = 0.55 * ridged(2.2 * t1) + 0.30 * ridged(3.7 * t2) + 0.15 * ridged(6.0 * t3);
-      let h = Math.pow(0.78 * base + 0.22 * spikes, 1.25);
-      pos.setY(i, (h * (40.0 + dist * 520.0) * 1.22) - 115.0);
+      pos.setY(i, getMountainHeight(x, z)); // Folosește logica matematică
     }
     mountainGeo.computeVertexNormals();
     const mountainMesh = new THREE.Mesh(mountainGeo, new THREE.MeshPhongMaterial({ map: muntiTexture, color: 0x888888 }));
@@ -172,54 +171,71 @@
     scene.add(mountainMesh);
   }
 
-  // --- 8. TEREN ȘI PATCH ---
+  // --- 6. TEREN SINGULAR (Rezolvă problema cu intratul sub iarbă!) ---
   function createGround() {
-    // Terenul de bază plat infinit
-    const groundGeo = new THREE.PlaneGeometry(4000, 4000);
+    // Generăm un singur teren uriaș, fără planuri suprapuse
+    const groundGeo = new THREE.PlaneGeometry(4000, 4000, 256, 256);
     groundGeo.rotateX(-Math.PI / 2);
+
+    const pos = groundGeo.attributes.position;
+    for(let i = 0; i < pos.count; i++) {
+      pos.setY(i, getTerrainHeight(pos.getX(i), pos.getZ(i)));
+    }
+    groundGeo.computeVertexNormals();
     const groundMesh = new THREE.Mesh(groundGeo, new THREE.MeshPhongMaterial({ map: iarbaTexture }));
     groundMesh.receiveShadow = true;
     scene.add(groundMesh);
-
-    // Zona noastră cu relief detaliat
-    const patchGeo = new THREE.PlaneGeometry(2000, 1300, 180, 160);
-    patchGeo.rotateX(-Math.PI / 2);
-    patchGeo.translate(0, 0, 150);
-
-    const patchPos = patchGeo.attributes.position;
-    for(let i=0; i<patchPos.count; i++) {
-      patchPos.setY(i, getTerrainHeight(patchPos.getX(i), patchPos.getZ(i)));
-    }
-    patchGeo.computeVertexNormals();
-    const patchMesh = new THREE.Mesh(patchGeo, new THREE.MeshPhongMaterial({ map: iarbaTexture }));
-    patchMesh.receiveShadow = true;
-    scene.add(patchMesh);
   }
 
-  // --- 9. AFIȘAREA CIRCUITULUI (Multe probleme rezolvate!) ---
+  // --- 7. CIRCUIT PANGLICĂ ---
   function createCircuit() {
-    const tubeGeo = new THREE.TubeGeometry(pathCurve, 200, 40, 10, true);
-    const potecaMesh = new THREE.Mesh(tubeGeo, new THREE.MeshPhongMaterial({ map: drumTexture, side: THREE.DoubleSide }));
+    const pointsCount = 400;
+    const roadWidth = 40;
+    const vertices = [], uvs = [], indices = [], normals = [];
 
-    potecaMesh.scale.set(1, 0.02, 1);
-    // Îl așezăm fix deasupra zonei plate (ROAD_HEIGHT) generată de funcția terenului
-    potecaMesh.position.y = ROAD_HEIGHT + 0.5;
+    for(let i = 0; i <= pointsCount; i++) {
+      const t = i / pointsCount;
+      const pt = pathCurve.getPointAt(t);
+      const tangent = pathCurve.getTangentAt(t).normalize();
+      const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
 
+      const pLeft = pt.clone().add(normal.clone().multiplyScalar(roadWidth / 2));
+      const pRight = pt.clone().add(normal.clone().multiplyScalar(-roadWidth / 2));
+
+      pLeft.y = getTerrainHeight(pLeft.x, pLeft.z) + 1.5;
+      pRight.y = getTerrainHeight(pRight.x, pRight.z) + 1.5;
+
+      vertices.push(pLeft.x, pLeft.y, pLeft.z);
+      vertices.push(pRight.x, pRight.y, pRight.z);
+
+      normals.push(0, 1, 0, 0, 1, 0);
+      uvs.push(0, t * 25, 1, t * 25);
+    }
+
+    for(let i = 0; i < pointsCount; i++) {
+      const idx = i * 2;
+      indices.push(idx, idx+2, idx+1);
+      indices.push(idx+1, idx+2, idx+3);
+    }
+
+    const roadGeo = new THREE.BufferGeometry();
+    roadGeo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    roadGeo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    roadGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    roadGeo.setIndex(indices);
+
+    const potecaMesh = new THREE.Mesh(roadGeo, new THREE.MeshPhongMaterial({ map: drumTexture, side: THREE.DoubleSide }));
     potecaMesh.receiveShadow = true;
     scene.add(potecaMesh);
   }
 
-  // --- 10. OBIECTE STATICE ---
+  // --- 8. OBIECTE STATICE ---
   function createEdelweiss() {
     const flowerGroup = new THREE.Group();
     const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 10, 4), new THREE.MeshPhongMaterial({ color: 0x447744 }));
-    stem.position.y = 5; stem.castShadow = true;
-    flowerGroup.add(stem);
-
+    stem.position.y = 5; stem.castShadow = true; flowerGroup.add(stem);
     const center = new THREE.Mesh(new THREE.SphereGeometry(1.5, 8, 8), new THREE.MeshPhongMaterial({ color: 0xffcc44 }));
-    center.position.y = 10; center.castShadow = true;
-    flowerGroup.add(center);
-
+    center.position.y = 10; center.castShadow = true; flowerGroup.add(center);
     const petalGeo = new THREE.ConeGeometry(1, 5, 3);
     petalGeo.rotateX(-Math.PI / 2);
     for (let i = 0; i < 6; i++) {
@@ -234,10 +250,7 @@
   }
 
   function createStone() {
-    const stone = new THREE.Mesh(
-      new THREE.DodecahedronGeometry(3 + Math.random() * 4, 0),
-      new THREE.MeshPhongMaterial({ color: 0x888888, flatShading: true })
-    );
+    const stone = new THREE.Mesh(new THREE.DodecahedronGeometry(3 + Math.random() * 4, 0), new THREE.MeshPhongMaterial({ color: 0x888888, flatShading: true }));
     stone.scale.set(1 + Math.random() * 0.5, 0.6 + Math.random() * 0.4, 1 + Math.random() * 0.5);
     stone.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
     stone.castShadow = true; stone.receiveShadow = true;
@@ -248,66 +261,48 @@
     const treeGroup = new THREE.Group();
     const trunkHeight = 25 + Math.random() * 10;
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 2.2, trunkHeight, 6), new THREE.MeshPhongMaterial({ color: 0x5c4033, flatShading: true }));
-    trunk.position.y = trunkHeight / 2;
-    trunk.castShadow = true; trunk.receiveShadow = true;
-    treeGroup.add(trunk);
-
+    trunk.position.y = trunkHeight / 2; trunk.castShadow = true; trunk.receiveShadow = true; treeGroup.add(trunk);
     const leavesMat = new THREE.MeshPhongMaterial({ color: [0x224422, 0x1a3a1a, 0x2a502a][Math.floor(Math.random()*3)], flatShading: true });
     const coneCount = 3 + Math.floor(Math.random() * 2);
     for (let i = 0; i < coneCount; i++) {
       const cone = new THREE.Mesh(new THREE.ConeGeometry(9 - (i * 1.5), 18 - (i * 1.5), 7), leavesMat);
-      cone.position.y = trunkHeight + (i * 7);
-      cone.castShadow = true; cone.receiveShadow = true;
-      treeGroup.add(cone);
+      cone.position.y = trunkHeight + (i * 7); cone.castShadow = true; cone.receiveShadow = true; treeGroup.add(cone);
     }
     const finalScale = 1.0 + Math.random() * 0.5;
     treeGroup.scale.set(finalScale, finalScale, finalScale);
     return treeGroup;
   }
 
-  // --- 11. STÂLPI DE ILUMINAT ---
   function createStreetLight(position, directionToRoad) {
     const group = new THREE.Group();
     group.position.copy(position);
 
     const metalMat = new THREE.MeshPhongMaterial({ color: 0x444444 });
-
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(1, 1.5, 45, 8), metalMat);
-    pole.position.y = 22.5;
-    pole.castShadow = true;
-    group.add(pole);
+    pole.position.y = 22.5; pole.castShadow = true; group.add(pole);
 
     const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 14, 8), metalMat);
-    arm.rotation.x = Math.PI / 2;
-    arm.position.set(0, 43, 7);
-    arm.castShadow = true;
-    group.add(arm);
+    arm.rotation.x = Math.PI / 2; arm.position.set(0, 43, 7); arm.castShadow = true; group.add(arm);
 
     const bulb = new THREE.Mesh(new THREE.SphereGeometry(1.5), new THREE.MeshBasicMaterial({ color: 0xffffee }));
-    bulb.position.set(0, 42.5, 13);
-    group.add(bulb);
+    bulb.position.set(0, 42.5, 13); group.add(bulb);
 
     const spotLight = new THREE.SpotLight(0xffeedd, 3.5, 400, Math.PI / 3, 0.6, 1.5);
     spotLight.position.set(0, 42.5, 13);
     spotLight.castShadow = true;
-    spotLight.shadow.mapSize.width = 1024;
-    spotLight.shadow.mapSize.height = 1024;
+    spotLight.shadow.mapSize.width = 1024; spotLight.shadow.mapSize.height = 1024;
     spotLight.shadow.bias = -0.001;
 
     const target = new THREE.Object3D();
     target.position.set(0, 0, 30);
-    group.add(target);
-    spotLight.target = target;
-    group.add(spotLight);
+    group.add(target); spotLight.target = target; group.add(spotLight);
 
     const targetPos = position.clone().add(directionToRoad);
     targetPos.y = position.y;
     group.lookAt(targetPos);
-
     scene.add(group);
   }
 
-  // --- POPULARE SCENĂ ---
   function isOnRoad(x, z, threshold = 95) {
     return getDistanceToRoad(x, z) < threshold;
   }
@@ -326,6 +321,7 @@
           cluster.add(flower);
         }
         scene.add(cluster); count++;
+        obstacles.push({ x: rX, z: rZ, radius: 2.0 }); // Hitbox Flori
       }
     }
 
@@ -336,6 +332,7 @@
         const stone = createStone();
         stone.position.set(rX, getTerrainHeight(rX, rZ), rZ);
         scene.add(stone); count++;
+        obstacles.push({ x: rX, z: rZ, radius: 4.0 }); // Hitbox Piatră
       }
     }
 
@@ -346,6 +343,7 @@
         const tree = createPineTreeTall();
         tree.position.set(rX, getTerrainHeight(rX, rZ), rZ);
         scene.add(tree); count++;
+        obstacles.push({ x: rX, z: rZ, radius: 3.5 }); // Hitbox Copac
       }
     }
   }
@@ -356,16 +354,126 @@
       const t = i / numLights;
       const point = pathCurve.getPointAt(t);
       const tangent = pathCurve.getTangentAt(t).normalize();
-
       const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
-
       const offset = 45;
       const lightPos = point.clone().add(normal.clone().multiplyScalar(offset));
       lightPos.y = getTerrainHeight(lightPos.x, lightPos.z);
 
       const dirToRoad = normal.clone().multiplyScalar(-1);
       createStreetLight(lightPos, dirToRoad);
+      obstacles.push({ x: lightPos.x, z: lightPos.z, radius: 3.5 }); // Hitbox Stâlp
     }
+  }
+
+  // --- 9. MAȘINA CONTROLABILĂ ---
+  const carGroup = new THREE.Group();
+
+  const chassisGeo = new THREE.BoxGeometry(6, 4, 12);
+  const chassisMat = new THREE.MeshPhongMaterial({ color: 0xcc0000 });
+  const chassis = new THREE.Mesh(chassisGeo, chassisMat);
+  chassis.position.y = 3;
+  chassis.castShadow = true;
+  carGroup.add(chassis);
+
+  const wheelGeo = new THREE.CylinderGeometry(1.5, 1.5, 1.5, 16);
+  wheelGeo.rotateZ(Math.PI / 2);
+  const wheelMat = new THREE.MeshPhongMaterial({ color: 0x222222 });
+
+  const wheelPositions = [
+    [-3.5, 1.5, -4], [3.5, 1.5, -4],
+    [-3.5, 1.5, 4],  [3.5, 1.5, 4]
+  ];
+
+  wheelPositions.forEach(pos => {
+    const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+    wheel.position.set(pos[0], pos[1], pos[2]);
+    wheel.castShadow = true;
+    carGroup.add(wheel);
+  });
+
+  scene.add(carGroup);
+
+  const startPos = pathCurve.getPointAt(0);
+  carGroup.position.set(startPos.x, getTerrainHeight(startPos.x, startPos.z) + 1.5, startPos.z);
+
+  const startTangent = pathCurve.getTangentAt(0);
+  const lookTarget = startPos.clone().add(startTangent);
+  lookTarget.y = carGroup.position.y;
+  carGroup.lookAt(lookTarget);
+
+  // --- LOGICA DE CONTROL ȘI COLIZIUNI ---
+  const keys = { w: false, a: false, s: false, d: false };
+
+  document.addEventListener('keydown', (e) => {
+    const key = e.key.toLowerCase();
+    if(key === 'w' || e.key === 'ArrowUp') keys.w = true;
+    if(key === 'a' || e.key === 'ArrowLeft') keys.a = true;
+    if(key === 's' || e.key === 'ArrowDown') keys.s = true;
+    if(key === 'd' || e.key === 'ArrowRight') keys.d = true;
+  });
+
+  document.addEventListener('keyup', (e) => {
+    const key = e.key.toLowerCase();
+    if(key === 'w' || e.key === 'ArrowUp') keys.w = false;
+    if(key === 'a' || e.key === 'ArrowLeft') keys.a = false;
+    if(key === 's' || e.key === 'ArrowDown') keys.s = false;
+    if(key === 'd' || e.key === 'ArrowRight') keys.d = false;
+  });
+
+  let carSpeed = 0;
+  const maxSpeed = 3.5;
+  const accel = 0.08;
+  const turnSpeed = 0.04;
+
+  function checkCollision(nextX, nextZ) {
+    const carRadius = 3.0; // Hitbox optimizat pentru condus
+
+    // 1. Marginea lumii
+    if (nextX < -1950 || nextX > 1950 || nextZ > 1950 || nextZ < -1450) return true;
+
+    // 2. Muntele (Coliziune matematică calculată precis)
+    const mY = getMountainHeight(nextX, nextZ);
+    const tY = getTerrainHeight(nextX, nextZ);
+    // Dacă stânca iese din iarbă, nu ai voie să treci
+    if (mY > tY + 1.0) return true;
+
+    // 3. Coliziuni cu restul obiectelor
+    for(let obs of obstacles) {
+      const dx = nextX - obs.x;
+      const dz = nextZ - obs.z;
+      if( (dx*dx + dz*dz) < (obs.radius + carRadius)**2 ) return true;
+    }
+
+    return false;
+  }
+
+  function updateCar() {
+    if(keys.w) carSpeed += accel;
+    else if(keys.s) carSpeed -= accel;
+    else carSpeed *= 0.95;
+
+    carSpeed = Math.max(-maxSpeed, Math.min(maxSpeed, carSpeed));
+
+    if(Math.abs(carSpeed) > 0.1) {
+      if(keys.a) carGroup.rotation.y += turnSpeed * Math.sign(carSpeed);
+      if(keys.d) carGroup.rotation.y -= turnSpeed * Math.sign(carSpeed);
+    }
+
+    const forwardVector = new THREE.Vector3(0, 0, 1).applyQuaternion(carGroup.quaternion);
+    const nextX = carGroup.position.x + forwardVector.x * carSpeed;
+    const nextZ = carGroup.position.z + forwardVector.z * carSpeed;
+
+    if(!checkCollision(nextX, nextZ)) {
+      carGroup.position.x = nextX;
+      carGroup.position.z = nextZ;
+    } else {
+      carSpeed = 0; // Oprit de obstacol!
+    }
+
+    // Mașina preia înălțimea terenului din punctul curent
+    carGroup.position.y = getTerrainHeight(carGroup.position.x, carGroup.position.z) + 1.5;
+
+    controls.target.copy(carGroup.position);
   }
 
   // --- INIȚIALIZARE ---
@@ -375,14 +483,16 @@
   populateField();
   populateStreetLights();
 
-  // CONTROL CAMERĂ
   camera.position.set(0, 400, 1200);
   const controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.maxPolarAngle = Math.PI / 2 - 0.05;
+  controls.minDistance = 20;
+  controls.maxDistance = 600;
 
   function animate() {
     requestAnimationFrame(animate);
+    updateCar();
     controls.update();
     renderer.render(scene, camera);
   }

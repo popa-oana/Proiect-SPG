@@ -27,7 +27,7 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
 <script>
-  // --- 1. SETĂRI DE BAZĂ ---
+  // SETĂRI DE BAZĂ
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0x8cb7e6, 500, 3500);
 
@@ -37,7 +37,7 @@
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
-  // --- 2. LUMINI ---
+  // LUMINI
   const ambientLight = new THREE.AmbientLight(new THREE.Color(0.50, 0.48, 0.40), 1.0);
   scene.add(ambientLight);
 
@@ -45,7 +45,7 @@
   sunLight.position.set(-100, 300, 200);
   scene.add(sunLight);
 
-  // --- 3. TEXTURI ---
+  // TEXTURI
   const textureLoader = new THREE.TextureLoader();
   const cerTexture = textureLoader.load('textures/cer.jpg');
   const muntiTexture = textureLoader.load('textures/munti.jpg', (tex) => {
@@ -59,7 +59,7 @@
     tex.repeat.set(1, 25);
   });
 
-  // --- 4. FUNKCII UTILIBARE ȘI LOGICĂ TEREN ---
+  // FUNCTII UTILITARE ȘI LOGICA TEREN
   const bulldozerThreshold = 18.0;
 
   function clamp01(v) { return Math.max(0.0, Math.min(1.0, v)); }
@@ -78,7 +78,7 @@
     return finalY;
   }
 
-  // --- 5. CER (SKYBOX) ---
+  // CER (SKYBOX)
   const skyboxGeometry = new THREE.BoxGeometry(4000, 4000, 4000);
   const skyboxMaterials = [
     new THREE.MeshBasicMaterial({ map: cerTexture, side: THREE.BackSide, depthWrite: false }),
@@ -91,7 +91,7 @@
   const skybox = new THREE.Mesh(skyboxGeometry, skyboxMaterials);
   scene.add(skybox);
 
-  // --- 6. MUNȚII ÎN FUNDAL (ORIGINALI) ---
+  // MUNȚII ÎN FUNDAL (ORIGINALI)
   function createMountainsReal() {
     const xMin = -1900.0, xMax = 1900.0;
     const zNear = -300.0, zFar = -1450.0;
@@ -121,7 +121,7 @@
     scene.add(new THREE.Mesh(mountainGeo, new THREE.MeshPhongMaterial({ map: muntiTexture, color: 0x888888 })));
   }
 
-  // --- 7. TEREN ȘI PATCH (ORIGINAL) ---
+  // TEREN ȘI PATCH (ORIGINAL)
   function createGround() {
     const groundGeo = new THREE.PlaneGeometry(4000, 4000);
     groundGeo.rotateX(-Math.PI / 2);
@@ -141,7 +141,7 @@
     scene.add(new THREE.Mesh(patchGeo, new THREE.MeshPhongMaterial({ map: iarbaTexture })));
   }
 
-  // --- 8. CIRCUIT NEREGULAT ---
+  // CIRCUIT NEREGULAT
   const pathCurve = new THREE.CatmullRomCurve3([
     new THREE.Vector3(-700, 0, 400),
     new THREE.Vector3(-450, 0, 750),
@@ -161,7 +161,7 @@
     scene.add(potecaMesh);
   }
 
-  // --- 9. OBIECTE STATICE: FLORI, PIETRE ȘI BRAZI ÎNALȚI ---
+  // OBIECTE STATICE: FLORI, PIETRE ȘI BRAZI ÎNALȚI
   function createEdelweiss() {
     const flowerGroup = new THREE.Group();
     const stemMat = new THREE.MeshPhongMaterial({ color: 0x447744 });
@@ -200,7 +200,7 @@
     return stone;
   }
 
-  // --- FUNCȚIA PENTRU BRAZI ÎNALȚI (P2.4 UPDATE) ---
+  // FUNCȚIA PENTRU BRAZI
   function createPineTreeTall() {
     const treeGroup = new THREE.Group();
 
@@ -222,8 +222,8 @@
     // Conuri mai mari și mai înalte
     const coneCount = 3 + Math.floor(Math.random() * 2);
     for (let i = 0; i < coneCount; i++) {
-      const coneRadius = 9 - (i * 1.5); // Baza mai lată
-      const coneHeight = 18 - (i * 1.5); // Conuri mai înalte
+      const coneRadius = 9 - (i * 1.5);
+      const coneHeight = 18 - (i * 1.5);
       const cone = new THREE.Mesh(new THREE.ConeGeometry(coneRadius, coneHeight, 7), leavesMat);
       // Plasăm conurile de la vârful trunchiului în sus
       cone.position.y = trunkHeight + (i * 7);
@@ -231,7 +231,7 @@
     }
 
     // Variem puțin dimensiunea finală
-    const finalScale = 1.0 + Math.random() * 0.5; // Mult mai mari în total
+    const finalScale = 1.0 + Math.random() * 0.5;
     treeGroup.scale.set(finalScale, finalScale, finalScale);
     return treeGroup;
   }
@@ -246,7 +246,7 @@
   }
 
   function populateField() {
-    // 1. Plasăm Florile (Grupuri)
+    // Plasăm Florile (Grupuri)
     let flowersPlaced = 0;
     while (flowersPlaced < 60) {
       const randX = Math.random() * 1800 - 900;
@@ -265,7 +265,7 @@
       }
     }
 
-    // 2. Plasăm Pietrele
+    // Plasăm Pietrele
     let stonesPlaced = 0;
     while (stonesPlaced < 70) {
       const randX = Math.random() * 1800 - 900;
@@ -278,7 +278,7 @@
       }
     }
 
-    // 3. Plasăm Brazii ÎNALȚI
+    // Plasăm Brazii ÎNALȚI
     let treesPlaced = 0;
     while (treesPlaced < 75) { // 75 de brazi înalți
       const randX = Math.random() * 1800 - 900;
@@ -293,7 +293,7 @@
     }
   }
 
-  // --- INIȚIALIZARE ---
+  // INIȚIALIZARE
   createMountainsReal();
   createGround();
   createCircuit();

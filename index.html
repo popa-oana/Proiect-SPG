@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Proiect SPG - Examen Complet (Trafic Inteligent)</title>
+  <title>Proiect SPG - Examen Complet (Trafic + 20 Văcuțe Libere)</title>
   <style>
     body { margin: 0; overflow: hidden; background-color: #8cb7e6; }
     canvas { display: block; }
@@ -21,7 +21,7 @@
   </style>
 </head>
 <body>
-<div id="info">EXAMEN FINAL: Conduce cu WASD. Trafic Inteligent!<br>Mașinile (4 NPC-uri) frânează automat ca să nu intre una în alta sau în tine.</div>
+<div id="info">EXAMEN FINAL COMPLET (C1 + C2)<br>Conduce cu WASD. Mașini pe asfalt, 20 Văcuțe pe iarbă. Coliziuni globale active!</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -89,7 +89,9 @@
     let minDistSq = Infinity;
     for (let i = 0; i < roadPoints.length; i++) {
       const p = roadPoints[i];
-      const distSq = (x - p.x)**2 + (z - p.z)**2;
+      const dx = x - p.x;
+      const dz = z - p.z;
+      const distSq = dx*dx + dz*dz;
       if (distSq < minDistSq) minDistSq = distSq;
     }
     return Math.sqrt(minDistSq);
@@ -295,15 +297,11 @@
     scene.add(group);
   }
 
-  function isOnRoad(x, z, threshold = 95) {
-    return getDistanceToRoad(x, z) < threshold;
-  }
-
   function populateField() {
     let count = 0;
     while (count < 60) {
       const rX = Math.random() * 1800 - 900, rZ = Math.random() * 1100 - 300;
-      if (!isOnRoad(rX, rZ, 80)) {
+      if (getDistanceToRoad(rX, rZ) >= 80) {
         const cluster = new THREE.Group();
         cluster.position.set(rX, getTerrainHeight(rX, rZ), rZ);
 
@@ -327,7 +325,7 @@
     count = 0;
     while (count < 70) {
       const rX = Math.random() * 1800 - 900, rZ = Math.random() * 1100 - 300;
-      if (!isOnRoad(rX, rZ, 80)) {
+      if (getDistanceToRoad(rX, rZ) >= 80) {
         const stone = createStone();
         stone.position.set(rX, getTerrainHeight(rX, rZ), rZ);
         scene.add(stone); count++;
@@ -338,7 +336,7 @@
     count = 0;
     while (count < 75) {
       const rX = Math.random() * 1800 - 900, rZ = Math.random() * 1100 - 300;
-      if (!isOnRoad(rX, rZ, 110)) {
+      if (getDistanceToRoad(rX, rZ) >= 110) {
         const tree = createPineTreeTall();
         tree.position.set(rX, getTerrainHeight(rX, rZ), rZ);
         scene.add(tree); count++;
@@ -368,30 +366,21 @@
   // --- 9. CONSTRUIREA MAȘINILOR ---
   function createCarModel(bodyColor) {
     const group = new THREE.Group();
-
     const chassisGeo = new THREE.BoxGeometry(6, 4, 12);
     const chassisMat = new THREE.MeshPhongMaterial({ color: bodyColor });
     const chassis = new THREE.Mesh(chassisGeo, chassisMat);
-    chassis.position.y = 3;
-    chassis.castShadow = true;
-    group.add(chassis);
+    chassis.position.y = 3; chassis.castShadow = true; group.add(chassis);
 
     const wheelGeo = new THREE.CylinderGeometry(1.5, 1.5, 1.5, 16);
     wheelGeo.rotateZ(Math.PI / 2);
     const wheelMat = new THREE.MeshPhongMaterial({ color: 0x222222 });
 
-    const wheelPositions = [
-      [-3.5, 1.5, -4], [3.5, 1.5, -4],
-      [-3.5, 1.5, 4],  [3.5, 1.5, 4]
-    ];
-
+    const wheelPositions = [[-3.5, 1.5, -4], [3.5, 1.5, -4], [-3.5, 1.5, 4], [3.5, 1.5, 4]];
     wheelPositions.forEach(pos => {
       const wheel = new THREE.Mesh(wheelGeo, wheelMat);
       wheel.position.set(pos[0], pos[1], pos[2]);
-      wheel.castShadow = true;
-      group.add(wheel);
+      wheel.castShadow = true; group.add(wheel);
     });
-
     return group;
   }
 
@@ -401,60 +390,44 @@
 
   const startPos = pathCurve.getPointAt(0);
   carGroup.position.set(startPos.x, getTerrainHeight(startPos.x, startPos.z) + 1.5, startPos.z);
-
   const startTangent = pathCurve.getTangentAt(0);
   const lookTarget = startPos.clone().add(startTangent);
   lookTarget.y = carGroup.position.y;
   carGroup.lookAt(lookTarget);
 
-  // 9.2 MAȘINILE NPC (4 Mașini pe 2 benzi)
+  // 9.2 MAȘINILE NPC
   const npcCars = [
-    { mesh: createCarModel(0x0044cc), t: 0.10, speed: 0.0006, lane: 10 }, // Albastră, banda dreaptă (mai rapidă)
-    { mesh: createCarModel(0x00cc44), t: 0.30, speed: 0.0006, lane: 10 }, // Verde, banda dreaptă (lenta)
-    { mesh: createCarModel(0xff8800), t: 0.50, speed: 0.0005, lane: -8 }, // Portocalie, banda stângă
-    { mesh: createCarModel(0xaa00cc), t: 0.80, speed: 0.0005, lane: -8 }  // Mov, banda stângă
+    { mesh: createCarModel(0x0044cc), t: 0.10, speed: 0.0006, lane: 10 },
+    { mesh: createCarModel(0x00cc44), t: 0.30, speed: 0.0004, lane: 10 },
+    { mesh: createCarModel(0xff8800), t: 0.50, speed: 0.0007, lane: -8 },
+    { mesh: createCarModel(0xaa00cc), t: 0.80, speed: 0.0005, lane: -8 }
   ];
-
   npcCars.forEach(npc => scene.add(npc.mesh));
 
-  // --- LOGICĂ INTELIGENTĂ (AI) PENTRU TRAFIC ---
   function updateNPCCars() {
     npcCars.forEach((npc, index) => {
       let canMove = true;
       const npcPos = npc.mesh.position;
-
-      // Vectorul care indică strict în față pe traiectoria curbei
       const forwardDir = pathCurve.getTangentAt(npc.t).normalize();
 
-      // Regula 1: Evită Jucătorul (Roșu)
       let toPlayer = carGroup.position.clone().sub(npcPos);
-      if (toPlayer.lengthSq() < 400) { // Distanță de alertă (aprox 20 unități)
-        // Verifică dacă ești ÎN FAȚA lui (folosind Produsul Scalar / Dot Product)
-        if (toPlayer.normalize().dot(forwardDir) > 0.3) {
-          canMove = false; // Frânează!
-        }
+      if (toPlayer.lengthSq() < 400) {
+        if (toPlayer.normalize().dot(forwardDir) > 0.3) canMove = false;
       }
 
-      // Regula 2: Evită celelalte mașini NPC
       npcCars.forEach((otherNpc, j) => {
-        if (index === j) return; // Nu te verifica pe tine însuți
-
+        if (index === j) return;
         let toOther = otherNpc.mesh.position.clone().sub(npcPos);
         if (toOther.lengthSq() < 400) {
-          // Dacă e în fața ta pe aceeași traiectorie, oprește-te!
-          if (toOther.normalize().dot(forwardDir) > 0.3) {
-            canMove = false;
-          }
+          if (toOther.normalize().dot(forwardDir) > 0.3) canMove = false;
         }
       });
 
-      // Dacă drumul e liber, rulează!
       if (canMove) {
         npc.t += npc.speed;
         if (npc.t > 1.0) npc.t -= 1.0;
       }
 
-      // Actualizăm modelul 3D pe șosea
       const pt = pathCurve.getPointAt(npc.t);
       const tangent = pathCurve.getTangentAt(npc.t).normalize();
       const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
@@ -468,7 +441,136 @@
     });
   }
 
-  // --- LOGICA DE CONTROL PENTRU JUCĂTOR ---
+  // --- 10. VĂCUȚELE (Mișcare Aleatorie & Evitare Copaci) ---
+  function createCow() {
+    const cowGroup = new THREE.Group();
+    const whiteMat = new THREE.MeshPhongMaterial({ color: 0xeeeeee });
+    const blackMat = new THREE.MeshPhongMaterial({ color: 0x222222 });
+    const pinkMat = new THREE.MeshPhongMaterial({ color: 0xffaaaa });
+
+    const body = new THREE.Mesh(new THREE.BoxGeometry(3, 2.5, 5), whiteMat);
+    body.position.y = 2.5; body.castShadow = true; cowGroup.add(body);
+
+    const head = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2.5), whiteMat);
+    head.position.set(0, 3.5, 3.5); head.castShadow = true; cowGroup.add(head);
+
+    const snout = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1, 1), pinkMat);
+    snout.position.set(0, 3, 4.8); snout.castShadow = true; cowGroup.add(snout);
+
+    const spot1 = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), blackMat);
+    spot1.position.set(1.51, 2.5, 0); spot1.rotation.y = Math.PI/2; cowGroup.add(spot1);
+    const spot2 = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), blackMat);
+    spot2.position.set(-1.51, 2.5, 1); spot2.rotation.y = -Math.PI/2; cowGroup.add(spot2);
+
+    const legGeo = new THREE.CylinderGeometry(0.4, 0.4, 1.5);
+    const legPos = [[-1, 0.75, -1.5], [1, 0.75, -1.5], [-1, 0.75, 1.5], [1, 0.75, 1.5]];
+    legPos.forEach(p => {
+      const leg = new THREE.Mesh(legGeo, blackMat);
+      leg.position.set(...p); leg.castShadow = true; cowGroup.add(leg);
+    });
+
+    cowGroup.scale.set(1.8, 1.8, 1.8);
+    return cowGroup;
+  }
+
+  const cows = [];
+
+  // NOU: Funcția de spawnare a vacilor DUPĂ ce s-au generat copacii, ca să nu se spawneze ÎN copaci.
+  function populateCows() {
+    for(let i=0; i<20; i++) {
+      let cowMesh = createCow();
+      let rx, rz, isSafe;
+
+      // Căutăm o zonă sigură (să nu fie pe drum, pe munte sau ÎN copaci)
+      do {
+        isSafe = true;
+        rx = Math.random() * 1800 - 900;
+        rz = Math.random() * 1100 - 300;
+
+        if(getDistanceToRoad(rx, rz) < 100) isSafe = false;
+        if(getMountainHeight(rx, rz) > getTerrainHeight(rx, rz) + 1.0) isSafe = false;
+
+        for(let obs of obstacles) {
+          const dx = rx - obs.x;
+          const dz = rz - obs.z;
+          if((dx*dx + dz*dz) < (obs.radius + 15.0)**2) {
+            isSafe = false;
+            break;
+          }
+        }
+      } while(!isSafe);
+
+      cowMesh.position.set(rx, getTerrainHeight(rx, rz), rz);
+      scene.add(cowMesh);
+
+      cows.push({
+        mesh: cowMesh,
+        angle: Math.random() * Math.PI * 2,
+        speed: 0.15 + Math.random() * 0.15,
+        actionTimer: Math.random() * 100,
+        isMoving: true
+      });
+    }
+  }
+
+  function checkCowCollision(nextX, nextZ) {
+    const cowRadius = 5.0;
+
+    if (nextX < -1900 || nextX > 1900 || nextZ > 1900 || nextZ < -1400) return true;
+    if (getMountainHeight(nextX, nextZ) > getTerrainHeight(nextX, nextZ) + 1.0) return true;
+    if (getDistanceToRoad(nextX, nextZ) < 35) return true;
+
+    for(let obs of obstacles) {
+      const dx = nextX - obs.x;
+      const dz = nextZ - obs.z;
+      if( (dx*dx + dz*dz) < (obs.radius + cowRadius)**2 ) return true;
+    }
+    return false;
+  }
+
+  function updateCows() {
+    cows.forEach(cow => {
+      cow.actionTimer--;
+
+      // Schimbarea stării (ADHD-ul vacii reparat)
+      if(cow.actionTimer <= 0) {
+        cow.isMoving = Math.random() > 0.2; // 80% șanse să aleagă să meargă
+        if(!cow.isMoving) {
+          // Stă pe loc între 1 și 2.5 secunde
+          cow.actionTimer = 60 + Math.random() * 100;
+        } else {
+          // Merg pe o direcție nouă (ușor diferită) între 3 și 8 secunde
+          cow.angle += (Math.random() - 0.5) * Math.PI / 2;
+          cow.actionTimer = 180 + Math.random() * 300;
+        }
+      }
+
+      if(cow.isMoving) {
+        const dx = Math.sin(cow.angle) * cow.speed;
+        const dz = Math.cos(cow.angle) * cow.speed;
+        const nx = cow.mesh.position.x + dx;
+        const nz = cow.mesh.position.z + dz;
+
+        if(!checkCowCollision(nx, nz)) {
+          cow.mesh.position.x = nx;
+          cow.mesh.position.z = nz;
+          cow.mesh.rotation.y = Math.atan2(dx, dz);
+          const bounce = Math.abs(Math.sin(Date.now() * 0.01)) * 0.8;
+          cow.mesh.position.y = getTerrainHeight(nx, nz) + bounce;
+        } else {
+          // Dacă se lovește grav de un copac, se întoarce la ~180 de grade
+          cow.angle += Math.PI + (Math.random() - 0.5);
+          // O forțăm să meargă înapoi ca să iasă din buclă!
+          cow.actionTimer = 150;
+          cow.isMoving = true;
+        }
+      } else {
+        cow.mesh.position.y = getTerrainHeight(cow.mesh.position.x, cow.mesh.position.z);
+      }
+    });
+  }
+
+  // --- LOGICA DE CONTROL JUCĂTOR ---
   const keys = { w: false, a: false, s: false, d: false };
 
   document.addEventListener('keydown', (e) => {
@@ -492,29 +594,31 @@
   const accel = 0.08;
   const turnSpeed = 0.04;
 
-  function checkCollision(nextX, nextZ) {
+  function checkPlayerCollision(nextX, nextZ) {
     const carRadius = 3.0;
 
-    // 1. Marginea lumii
     if (nextX < -1950 || nextX > 1950 || nextZ > 1950 || nextZ < -1450) return true;
 
-    // 2. Muntele
     const mY = getMountainHeight(nextX, nextZ);
     const tY = getTerrainHeight(nextX, nextZ);
     if (mY > tY + 1.0) return true;
 
-    // 3. Obiecte statice
     for(let obs of obstacles) {
       const dx = nextX - obs.x;
       const dz = nextZ - obs.z;
       if( (dx*dx + dz*dz) < (obs.radius + carRadius)**2 ) return true;
     }
 
-    // 4. Te lovești fizic de alte mașini
     for(let npc of npcCars) {
       const dx = nextX - npc.mesh.position.x;
       const dz = nextZ - npc.mesh.position.z;
-      if( (dx*dx + dz*dz) < 100 ) return true; // Coliziune masivă (raza 10)
+      if( (dx*dx + dz*dz) < 100 ) return true;
+    }
+
+    for(let cow of cows) {
+      const dx = nextX - cow.mesh.position.x;
+      const dz = nextZ - cow.mesh.position.z;
+      if( (dx*dx + dz*dz) < (5.0 + carRadius)**2 ) return true;
     }
 
     return false;
@@ -536,11 +640,11 @@
     const nextX = carGroup.position.x + forwardVector.x * carSpeed;
     const nextZ = carGroup.position.z + forwardVector.z * carSpeed;
 
-    if(!checkCollision(nextX, nextZ)) {
+    if(!checkPlayerCollision(nextX, nextZ)) {
       carGroup.position.x = nextX;
       carGroup.position.z = nextZ;
     } else {
-      carSpeed = 0; // Accident!
+      carSpeed = 0;
     }
 
     carGroup.position.y = getTerrainHeight(carGroup.position.x, carGroup.position.z) + 1.5;
@@ -551,8 +655,9 @@
   createMountainsReal();
   createGround();
   createCircuit();
-  populateField();
-  populateStreetLights();
+  populateField();       // PUNEM COPACII ȘI PIETRELE
+  populateStreetLights(); // PUNEM STÂLPII
+  populateCows();        // ABIA APOI PUNEM VĂCUȚELE, ÎN ZONE SIGURE
 
   camera.position.set(0, 400, 1200);
   const controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -564,6 +669,7 @@
   function animate() {
     requestAnimationFrame(animate);
 
+    updateCows();
     updateNPCCars();
     updatePlayerCar();
 

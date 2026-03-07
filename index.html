@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Proiect SPG - Examen Complet</title>
+  <title>Proiect SPG</title>
   <style>
     body { margin: 0; overflow: hidden; background-color: #8cb7e6; }
     canvas { display: block; }
@@ -15,8 +15,11 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
 <script>
-  // --- 1. SETĂRI DE BAZĂ ȘI UMBRE ---
+  // TASK P1 - Definirea scenei intr-un cub
+  // Crearea scenei principale si setarea culorii de fundal (cer)
   const scene = new THREE.Scene();
+
+  // Implementarea cetii
   scene.fog = new THREE.Fog(0x8cb7e6, 500, 3500);
 
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1.0, 8000);
@@ -24,16 +27,20 @@
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setClearColor(new THREE.Color(0.55, 0.72, 0.90));
   renderer.setSize(window.innerWidth, window.innerHeight);
+
+  // TASK P3 - Adaugarea unei surse de lumina si umbre
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   document.body.appendChild(renderer.domElement);
 
   const obstacles = [];
 
-  // --- 2. LUMINI GLOBALE ---
+  // TASK P3 - Adaugarea unei surse de lumina si umbre
+  // Lumina ambientala pentru a ilumina uniform partile intunecate
   const ambientLight = new THREE.AmbientLight(new THREE.Color(0.40, 0.38, 0.35), 0.8);
   scene.add(ambientLight);
 
+  // Soarele (Lumina directionala) care genereaza umbrele principale ale obiectelor
   const sunLight = new THREE.DirectionalLight(new THREE.Color(1.0, 0.95, 0.85), 1.2);
   sunLight.position.set(-500, 800, 400);
   sunLight.castShadow = true;
@@ -49,7 +56,7 @@
   sunLight.shadow.bias = -0.001;
   scene.add(sunLight);
 
-  // --- 3. TEXTURI ---
+  // TASK P1 - Adaugarea de texturi pentru baza (teren) si orizont (cer, munti)
   const textureLoader = new THREE.TextureLoader();
   const cerTexture = textureLoader.load('textures/cer.jpg');
   const muntiTexture = textureLoader.load('textures/munti.jpg', (tex) => {
@@ -58,18 +65,20 @@
   const iarbaTexture = textureLoader.load('textures/iarba.jpg', (tex) => {
     tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
   });
+
+  // TASK P2 - Texturarea corespunzatoare a circuitului
   const drumTexture = textureLoader.load('textures/drum.jpg', (tex) => {
     tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
     tex.repeat.set(1, 25);
   });
 
-  // --- 4. MATEMATICA TERENULUI ȘI A DRUMULUI ---
+  // TASK P2 - Definirea geometrica a unui circuit stradal inchis
   const pathCurve = new THREE.CatmullRomCurve3([
     new THREE.Vector3(-700, 0, 400), new THREE.Vector3(-450, 0, 750),
     new THREE.Vector3(150, 0, 600),  new THREE.Vector3(550, 0, 850),
     new THREE.Vector3(800, 0, 300),  new THREE.Vector3(450, 0, -100),
     new THREE.Vector3(50, 0, -250),  new THREE.Vector3(-500, 0, -50)
-  ], true);
+  ], true); // 'true' inchide circuitul
 
   const roadPoints = pathCurve.getPoints(400);
 
@@ -85,6 +94,8 @@
     return Math.sqrt(minDistSq);
   }
 
+  // TASK P1 - Adaugarea unei zone de relief in interiorul scenei
+  // Calculul matematic bazat pe sin/cos si noise pentru a genera denivelari organice
   const bulldozerThreshold = 18.0;
   const ROAD_HEIGHT = 1.0;
 
@@ -101,6 +112,7 @@
     return finalY;
   }
 
+  // Blending intre terenul accidentat si zona neteda a drumului
   function getTerrainHeight(x, z) {
     const rawY = getRawTerrainHeight(x, z);
     const dist = getDistanceToRoad(x, z);
@@ -115,6 +127,7 @@
     } else return rawY;
   }
 
+  // Generarea inaltimilor extreme pentru peretele de munti din background
   function getMountainHeight(x, z) {
     if (z > -300) return -9999;
     let dist = clamp01((-z - 300.0) / 1100.0);
@@ -127,7 +140,7 @@
     return (h * (40.0 + dist * 520.0) * 1.22) - 115.0;
   }
 
-  // --- 5. CER ȘI MUNȚI ---
+  // CER SI MUNTI (Asezarea vizuala a orizontului din cerintele P1)
   const skyboxGeometry = new THREE.BoxGeometry(4000, 4000, 4000);
   const skyboxMaterials = [
     new THREE.MeshBasicMaterial({ map: cerTexture, side: THREE.BackSide, depthWrite: false }),
@@ -154,7 +167,7 @@
     scene.add(mountainMesh);
   }
 
-  // --- 6. TEREN SINGULAR ---
+  // Generare mesh teren singular
   function createGround() {
     const groundGeo = new THREE.PlaneGeometry(4000, 4000, 256, 256);
     groundGeo.rotateX(-Math.PI / 2);
@@ -169,7 +182,7 @@
     scene.add(groundMesh);
   }
 
-  // --- 7. CIRCUIT PANGLICĂ ---
+  // Generare geometry efectiv pentru circuitul inchis
   function createCircuit() {
     const pointsCount = 400;
     const roadWidth = 40;
@@ -211,7 +224,7 @@
     scene.add(potecaMesh);
   }
 
-  // --- 8. OBIECTE STATICE ---
+  // TASK P2 - Adaugarea a minim 10 obiecte statice populate mai jos in functia populateField()
   function createEdelweiss() {
     const flowerGroup = new THREE.Group();
     const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 10, 4), new THREE.MeshPhongMaterial({ color: 0x447744 }));
@@ -227,7 +240,7 @@
       petal.rotation.y = angle; petal.castShadow = true;
       flowerGroup.add(petal);
     }
-    flowerGroup.scale.set(0.35, 0.35, 0.35); // Flori micuțe și delicate
+    flowerGroup.scale.set(0.35, 0.35, 0.35);
     return flowerGroup;
   }
 
@@ -255,6 +268,8 @@
     return treeGroup;
   }
 
+  // TASK P3 - Adaugarea unor stalpi de iluminat care produc umbre multiple
+  // SpotLight urmareste geometria drumului
   function createStreetLight(position, directionToRoad) {
     const group = new THREE.Group();
     group.position.copy(position);
@@ -271,7 +286,7 @@
 
     const spotLight = new THREE.SpotLight(0xffeedd, 3.5, 400, Math.PI / 3, 0.6, 1.5);
     spotLight.position.set(0, 42.5, 13);
-    spotLight.castShadow = true;
+    spotLight.castShadow = true; // Sursa ce produce umbre multiple per stalp
     spotLight.shadow.mapSize.width = 1024; spotLight.shadow.mapSize.height = 1024;
     spotLight.shadow.bias = -0.001;
 
@@ -289,6 +304,7 @@
     return getDistanceToRoad(x, z) < threshold;
   }
 
+  // Generarea celor >10 obiecte statice cerute de P2
   function populateField() {
     let count = 0;
     while (count < 60) {
@@ -308,7 +324,7 @@
 
           const flowerWorldX = rX + offsetX;
           const flowerWorldZ = rZ + offsetZ;
-          obstacles.push({ x: flowerWorldX, z: flowerWorldZ, radius: 0.8 });
+          obstacles.push({ x: flowerWorldX, z: flowerWorldZ, radius: 0.8 }); // Inregistrare obstacol static (C1)
         }
         scene.add(cluster); count++;
       }
@@ -355,7 +371,8 @@
     }
   }
 
-  // --- 9. CONSTRUIREA MAȘINILOR NPC ---
+  // TASK C2 - Adaugarea unor obiecte care se misca dupa o regula prestabilita
+  // Masinile urmeaza traiectoria circuitului definit matematic
   function createCarModel(bodyColor) {
     const group = new THREE.Group();
     const chassisGeo = new THREE.BoxGeometry(6, 4, 12);
@@ -374,20 +391,19 @@
       wheel.castShadow = true; group.add(wheel);
     });
 
-    // MODIFICARE: Dimensiune mașini redusă la 1.5 (arată ca mașini normale pe banda de 40)
     group.scale.set(2, 2, 2);
     return group;
   }
 
   const npcCars = [
-    { mesh: createCarModel(0x0044cc), t: 0.10, speed: 0.0006, lane: 10 },
-    { mesh: createCarModel(0x00cc44), t: 0.30, speed: 0.0004, lane: 10 },
+    { mesh: createCarModel(0x0044cc), t: 0.10, speed: 0.0005, lane: 10 },
+    { mesh: createCarModel(0x00cc44), t: 0.30, speed: 0.0005, lane: 10 },
     { mesh: createCarModel(0xff8800), t: 0.50, speed: 0.0007, lane: -8 },
-    { mesh: createCarModel(0xaa00cc), t: 0.80, speed: 0.0005, lane: -8 }
+    { mesh: createCarModel(0xaa00cc), t: 0.80, speed: 0.0007, lane: -8 }
   ];
   npcCars.forEach(npc => scene.add(npc.mesh));
 
-  // --- 10. CONSTRUIREA PIETONULUI (JUCĂTOR) ---
+  // TASK C1 - Adaugarea unui obiect controlabil (pieton)
   const Mesh = THREE.Mesh;
 
   function createPlayerModel() {
@@ -417,7 +433,6 @@
     const capGroup = new THREE.Group();
     capGroup.position.y = 5.5;
 
-    // Șapcă perfect roșie, complet acoperitoare pe creștet
     const capDomeGeo = new THREE.SphereGeometry(0.82, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2.2);
     const capDome = new THREE.Mesh(capDomeGeo, shirtMat);
     capDome.position.y = 0.05;
@@ -431,7 +446,7 @@
     capGroup.add(capBrim);
 
     group.add(capGroup);
-    group.scale.set(2.5, 2.5, 2.5);
+    group.scale.set(2.8, 2.8, 2.8);
     return group;
   }
 
@@ -452,7 +467,6 @@
       const forwardDir = pathCurve.getTangentAt(npc.t).normalize();
 
       let toPlayer = playerGroup.position.clone().sub(npcPos);
-      // Ajustat distanța de alertă pentru mașini mai mici
       if (toPlayer.lengthSq() < 400) {
         if (toPlayer.normalize().dot(forwardDir) > 0.3) canMove = false;
       }
@@ -460,7 +474,7 @@
       npcCars.forEach((otherNpc, j) => {
         if (index === j) return;
         let toOther = otherNpc.mesh.position.clone().sub(npcPos);
-        if (toOther.lengthSq() < 625) { // Distanță între 2 mașini micșorată proporțional
+        if (toOther.lengthSq() < 625) {
           if (toOther.normalize().dot(forwardDir) > 0.3) canMove = false;
         }
       });
@@ -483,7 +497,7 @@
     });
   }
 
-  // --- 11. ANIMALE ---
+  // TASK C2 - Adaugarea unor obiecte care se misca aleator (Animalele)
   function checkAnimalCollision(nextX, nextZ, animalRadius) {
     if (nextX < -1900 || nextX > 1900 || nextZ > 1900 || nextZ < -1400) return true;
     if (getMountainHeight(nextX, nextZ) > getTerrainHeight(nextX, nextZ) + 1.0) return true;
@@ -497,7 +511,6 @@
     return false;
   }
 
-  // VĂCUȚELE
   function createCow() {
     const cowGroup = new THREE.Group();
     const whiteMat = new THREE.MeshPhongMaterial({ color: 0xeeeeee });
@@ -557,6 +570,7 @@
   function updateCows() {
     cows.forEach(cow => {
       cow.actionTimer--;
+      // Vacile iau decizii periodice (sa stea / sa mearga / sa schimbe directia)
       if(cow.actionTimer <= 0) {
         cow.isMoving = Math.random() > 0.2;
         if(!cow.isMoving) {
@@ -567,14 +581,14 @@
         }
       }
 
-      // LOGICĂ NOUĂ: Vaca evită pietonul (așteaptă ca mașinile)
       let canMove = cow.isMoving;
       const forwardDir = new THREE.Vector3(Math.sin(cow.angle), 0, Math.cos(cow.angle));
       let toPlayer = playerGroup.position.clone().sub(cow.mesh.position);
 
+      // Vacile au un "hitbox de proximitate", daca jucatorul este in calea lor se opresc ca sa evite coliziunea
       if (toPlayer.lengthSq() < 625) {
         if (toPlayer.normalize().dot(forwardDir) > 0.2) {
-          canMove = false; // Vaca se oprește dacă pietonul e în fața ei
+          canMove = false;
         }
       }
 
@@ -591,6 +605,7 @@
           const bounce = Math.abs(Math.sin(Date.now() * 0.01)) * 0.8;
           cow.mesh.position.y = getTerrainHeight(nx, nz) + bounce;
         } else {
+          // Intoarcere in caz de coliziune iminenta cu obstacole din mediu
           cow.angle += Math.PI + (Math.random() - 0.5);
           cow.actionTimer = 150;
           cow.isMoving = true;
@@ -601,7 +616,8 @@
     });
   }
 
-  // CĂȚELUȘII
+  // CATEL COMPANION
+  // Calculeaza constant distanta pana la jucator si il urmareste
   function createDog() {
     const dogGroup = new THREE.Group();
     const beigeMat = new THREE.MeshPhongMaterial({ color: 0xe8c396 });
@@ -626,82 +642,52 @@
     return dogGroup;
   }
 
-  const dogs = [];
-  function populateDogs() {
-    for(let i=0; i<3; i++) {
-      let dogMesh = createDog();
-      let rx, rz, isSafe;
-      do {
-        isSafe = true;
-        rx = Math.random() * 1800 - 900;
-        rz = Math.random() * 1100 - 300;
-        if(getDistanceToRoad(rx, rz) < 100) isSafe = false;
-        if(getMountainHeight(rx, rz) > getTerrainHeight(rx, rz) + 1.0) isSafe = false;
-        for(let obs of obstacles) {
-          const dx = rx - obs.x; const dz = rz - obs.z;
-          if((dx*dx + dz*dz) < (obs.radius + 10.0)**2) { isSafe = false; break; }
-        }
-      } while(!isSafe);
-      dogMesh.position.set(rx, getTerrainHeight(rx, rz), rz);
-      scene.add(dogMesh);
+  let petDog = null;
 
-      dogs.push({
-        mesh: dogMesh,
-        angle: Math.random() * Math.PI * 2,
-        speed: 0.4 + Math.random() * 0.3,
-        actionTimer: Math.random() * 50,
-        isMoving: true
-      });
+  function initPetDog() {
+    petDog = createDog();
+    const offset = new THREE.Vector3(0, 0, -15).applyQuaternion(playerGroup.quaternion);
+    petDog.position.copy(playerGroup.position).add(offset);
+    petDog.position.y = getTerrainHeight(petDog.position.x, petDog.position.z);
+    scene.add(petDog);
+  }
+
+  function updatePetDog() {
+    if (!petDog) return;
+
+    const dogSpeed = 1.75;
+    const stopDistance = 12.0;
+
+    const toPlayer = playerGroup.position.clone().sub(petDog.position);
+    toPlayer.y = 0;
+
+    const distance = toPlayer.length();
+
+    if (distance > stopDistance) {
+      // Catelul merge dupa stapan cand se distanteaza
+      toPlayer.normalize();
+
+      const targetAngle = Math.atan2(toPlayer.x, toPlayer.z);
+      petDog.rotation.y = targetAngle;
+
+      const nextX = petDog.position.x + toPlayer.x * dogSpeed;
+      const nextZ = petDog.position.z + toPlayer.z * dogSpeed;
+
+      petDog.position.x = nextX;
+      petDog.position.z = nextZ;
+
+      // Efect de topait aplicat calculului pe Y
+      const bounce = Math.abs(Math.sin(Date.now() * 0.025)) * 1.0;
+      petDog.position.y = getTerrainHeight(nextX, nextZ) + bounce;
+    } else {
+      // Catelul sta pe loc si se uita la jucator
+      petDog.position.y = getTerrainHeight(petDog.position.x, petDog.position.z);
+      const targetAngle = Math.atan2(toPlayer.x, toPlayer.z);
+      petDog.rotation.y = targetAngle;
     }
   }
 
-  function updateDogs() {
-    dogs.forEach(dog => {
-      dog.actionTimer--;
-      if(dog.actionTimer <= 0) {
-        dog.isMoving = Math.random() > 0.1;
-        if(!dog.isMoving) {
-          dog.actionTimer = 20 + Math.random() * 40;
-        } else {
-          dog.angle += (Math.random() - 0.5) * Math.PI;
-          dog.actionTimer = 60 + Math.random() * 150;
-        }
-      }
-
-      let canMove = dog.isMoving;
-      const forwardDir = new THREE.Vector3(Math.sin(dog.angle), 0, Math.cos(dog.angle));
-      let toPlayer = playerGroup.position.clone().sub(dog.mesh.position);
-
-      if (toPlayer.lengthSq() < 400) {
-        if (toPlayer.normalize().dot(forwardDir) > 0.2) {
-          canMove = false; // Cățelul te așteaptă și el
-        }
-      }
-
-      if(canMove) {
-        const dx = Math.sin(dog.angle) * dog.speed;
-        const dz = Math.cos(dog.angle) * dog.speed;
-        const nx = dog.mesh.position.x + dx;
-        const nz = dog.mesh.position.z + dz;
-
-        if(!checkAnimalCollision(nx, nz, 3.0)) {
-          dog.mesh.position.x = nx;
-          dog.mesh.position.z = nz;
-          dog.mesh.rotation.y = Math.atan2(dx, dz);
-          const bounce = Math.abs(Math.sin(Date.now() * 0.025)) * 1.0;
-          dog.mesh.position.y = getTerrainHeight(nx, nz) + bounce;
-        } else {
-          dog.angle += Math.PI + (Math.random() - 0.5);
-          dog.actionTimer = 50;
-          dog.isMoving = true;
-        }
-      } else {
-        dog.mesh.position.y = getTerrainHeight(dog.mesh.position.x, dog.mesh.position.z);
-      }
-    });
-  }
-
-  // --- 12. LOGICA DE CONTROL PIETON (WASD) ---
+  // TASK C1 - Controlul obiectului controlabil (WASD)
   const keys = { w: false, a: false, s: false, d: false };
 
   document.addEventListener('keydown', (e) => {
@@ -725,39 +711,38 @@
   const accel = 0.15;
   const turnSpeed = 0.06;
 
+  // TASK C1 - Detectarea coliziunilor dintre obiectele statice, mediu si jucator
   function checkPlayerCollision(nextX, nextZ) {
     const playerRadius = 3.5;
 
+    // Coliziuni limitele hartii
     if (nextX < -1950 || nextX > 1950 || nextZ > 1950 || nextZ < -1450) return true;
 
+    // Coliziuni diferenta de nivel intre munte abrupt si teren normal
     const mY = getMountainHeight(nextX, nextZ);
     const tY = getTerrainHeight(nextX, nextZ);
     if (mY > tY + 1.0) return true;
 
+    // Coliziune cu "Obstacles" (inregistrate la Task-ul P2 cand am generat copaci/pietre)
     for(let obs of obstacles) {
       const dx = nextX - obs.x;
       const dz = nextZ - obs.z;
       if( (dx*dx + dz*dz) < (obs.radius + playerRadius)**2 ) return true;
     }
 
+    // Coliziuni cu masinile NPC (Task C2)
     for(let npc of npcCars) {
       const dx = nextX - npc.mesh.position.x;
       const dz = nextZ - npc.mesh.position.z;
-      if( (dx*dx + dz*dz) < (7.0 + playerRadius)**2 ) return true; // Hitbox reglat la scara de 1.5 a mașinii
+      if( (dx*dx + dz*dz) < (7.0 + playerRadius)**2 ) return true;
     }
 
+    // Coliziuni cu vacutele random (Task C2)
     for(let cow of cows) {
       const dx = nextX - cow.mesh.position.x;
       const dz = nextZ - cow.mesh.position.z;
       if( (dx*dx + dz*dz) < (6.0 + playerRadius)**2 ) return true;
     }
-
-    for(let dog of dogs) {
-      const dx = nextX - dog.mesh.position.x;
-      const dz = nextZ - dog.mesh.position.z;
-      if( (dx*dx + dz*dz) < (3.0 + playerRadius)**2 ) return true;
-    }
-
     return false;
   }
 
@@ -781,31 +766,36 @@
       playerGroup.position.x = nextX;
       playerGroup.position.z = nextZ;
     } else {
-      playerSpeed = 0;
+      playerSpeed = 0; // Jucatorul e oprit instant la detectarea coliziunii
     }
 
+    // Miscare tip "bobbing" legata de viteza de mers
     let bob = 0;
     if (Math.abs(playerSpeed) > 0.1) {
       bob = Math.abs(Math.sin(Date.now() * 0.015)) * 0.5;
     }
 
     playerGroup.position.y = getTerrainHeight(playerGroup.position.x, playerGroup.position.z) + bob;
+
+    // TASK P3 - Controlul camerei - legam tinta controalelor Orbit de pozitia jucatorului
     controls.target.copy(playerGroup.position);
   }
 
-  // --- INIȚIALIZARE ---
+  // INITIALIZARE GLOBALA JOC
   createMountainsReal();
   createGround();
   createCircuit();
   populateField();
   populateStreetLights();
   populateCows();
-  populateDogs();
+  initPetDog();
 
+  // TASK P3 - Controlul camerei pe toate cele trei axe si rotatii
+  // Folosind OrbitControls pentru Pan, Zoom, Rotate liber in jurul jucatorului
   camera.position.set(0, 100, 200);
   const controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
-  controls.maxPolarAngle = Math.PI / 2 - 0.05;
+  controls.maxPolarAngle = Math.PI / 2 - 0.05; // Nu lasa camera sub pamant
   controls.minDistance = 10;
   controls.maxDistance = 600;
 
@@ -813,11 +803,11 @@
     requestAnimationFrame(animate);
 
     updateCows();
-    updateDogs();
+    updatePetDog();
     updateNPCCars();
     updatePlayer();
 
-    controls.update();
+    controls.update(); // Update la engine-ul intern pentru OrbitControls
     renderer.render(scene, camera);
   }
 
